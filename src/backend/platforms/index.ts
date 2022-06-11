@@ -1,4 +1,4 @@
-import { Question } from "@prisma/client";
+import { Question, PastcastQuestion } from "@prisma/client";
 
 import { QuestionOption } from "../../common/types";
 import { prisma } from "../database/prisma";
@@ -40,6 +40,8 @@ export type FetchedQuestion = Omit<
   qualityindicators: Omit<QualityIndicators, "stars">; // slightly stronger type than Prisma's JsonValue
 };
 
+export type FetchedPastcastQuestion = Omit<PastcastQuestion, | "fetched" | "platform" | "isDeleted">;
+
 // fetcher should return null if platform failed to fetch questions for some reason
 type PlatformFetcherV1 = () => Promise<FetchedQuestion[] | null>;
 
@@ -53,9 +55,20 @@ type PlatformFetcherV2<ArgNames extends string> = (opts: {
   args?: { [k in ArgNames]: string };
 }) => Promise<PlatformFetcherV2Result>;
 
+type PlatformPastcastFetcherV2Result = {
+  questions: FetchedPastcastQuestion[];
+  // if partial is true then we won't cleanup old questions from the database; this is useful when manually invoking a fetcher with arguments for updating a single question
+  partial: boolean;
+} | null;
+
+type PlatformPastcastFetcherV2<ArgNames extends string> = (opts: {
+  args?: { [k in ArgNames]: string };
+}) => Promise<PlatformPastcastFetcherV2Result>;
+
 export type PlatformFetcher<ArgNames extends string> =
   | PlatformFetcherV1
-  | PlatformFetcherV2<ArgNames>;
+  | PlatformFetcherV2<ArgNames>
+  | PlatformPastcastFetcherV2<ArgNames>;
 
 // using "" as ArgNames default is technically incorrect, but shouldn't cause any real issues
 // (I couldn't find a better solution for signifying an empty value, though there probably is one)
@@ -63,18 +76,24 @@ export type Platform<ArgNames extends string = ""> = {
   name: string; // short name for ids and `platform` db column, e.g. "xrisk"
   label: string; // longer name for displaying on frontend etc., e.g. "X-risk estimates"
   color: string; // used on frontend
-  calculateStars: (question: FetchedQuestion) => number;
 } & (
-  | {
+    | {
       version: "v1";
       fetcher?: PlatformFetcherV1;
+      calculateStars: (question: FetchedQuestion) => number;
     }
-  | {
+    | {
       version: "v2";
       fetcherArgs?: ArgNames[];
       fetcher?: PlatformFetcherV2<ArgNames>;
+      calculateStars: (question: FetchedQuestion) => number;
     }
-);
+    | {
+      version: "pastcast";
+      fetcherArgs?: ArgNames[];
+      fetcher?: PlatformPastcastFetcherV2<ArgNames>;
+    }
+  );
 
 // Typing notes:
 // There's a difference between prisma's Question type (type returned from `find` and `findMany`) and its input types due to JsonValue vs InputJsonValue mismatch.
@@ -90,6 +109,8 @@ type PreparedQuestion = Omit<
   options: NonNullable<Question["options"]>;
 };
 
+type PreparedPastcastQuestion = Omit<PastcastQuestion, "isDeleted">;
+
 export const prepareQuestion = (
   q: FetchedQuestion,
   platform: Platform<any>
@@ -101,8 +122,19 @@ export const prepareQuestion = (
     platform: platform.name,
     qualityindicators: {
       ...q.qualityindicators,
-      stars: platform.calculateStars(q),
+      stars: platform.version !== "pastcast" && platform.calculateStars(q),
     },
+  };
+};
+
+export const preparePastcastQuestion = (
+  q: FetchedPastcastQuestion,
+  platform: Platform<any>
+): PreparedPastcastQuestion => {
+  return {
+    ...q,
+    fetched: new Date(),
+    platform: platform.name,
   };
 };
 
@@ -145,74 +177,137 @@ export const processPlatform = async <T extends string = "">(
     return;
   }
 
-  const oldQuestions = await prisma.question.findMany({
-    where: {
-      platform: platform.name,
-    },
-  });
-
-  const fetchedIds = fetchedQuestions.map((q) => q.id);
-  const oldIds = oldQuestions.map((q) => q.id);
-
-  const fetchedIdsSet = new Set(fetchedIds);
-  const oldIdsSet = new Set(oldIds);
-
-  const createdQuestions: PreparedQuestion[] = [];
-  const updatedQuestions: PreparedQuestion[] = [];
-  const deletedIds = oldIds.filter((id) => !fetchedIdsSet.has(id));
-
-  for (const q of fetchedQuestions.map((q) => prepareQuestion(q, platform))) {
-    if (oldIdsSet.has(q.id)) {
-      // TODO - check if question has changed for better performance
-      updatedQuestions.push(q);
-    } else {
-      createdQuestions.push(q);
-    }
-  }
-
-  const stats: { created?: number; updated?: number; deleted?: number } = {};
-
-  await prisma.question.createMany({
-    data: createdQuestions.map((q) => ({
-      ...q,
-      firstSeen: new Date(),
-    })),
-  });
-  stats.created = createdQuestions.length;
-
-  for (const q of updatedQuestions) {
-    await prisma.question.update({
-      where: { id: q.id },
-      data: q,
-    });
-    stats.updated ??= 0;
-    stats.updated++;
-  }
-
-  if (!partial) {
-    await prisma.question.deleteMany({
+  if (platform.version === "pastcast") {
+    const oldQuestions = await prisma.pastcastQuestion.findMany({
       where: {
-        id: {
-          in: deletedIds,
-        },
+        platform: platform.name,
       },
     });
-    stats.deleted = deletedIds.length;
-  }
 
-  await prisma.history.createMany({
-    data: [...createdQuestions, ...updatedQuestions].map((q) => ({
-      ...q,
-      idref: q.id,
-    })),
-  });
+    const fetchedIds = fetchedQuestions.map((q) => q.id);
+    const oldIds = oldQuestions.map((q) => q.id);
 
-  console.log(
-    "Done, " +
+    const fetchedIdsSet = new Set(fetchedIds);
+    const oldIdsSet = new Set(oldIds);
+
+    const createdQuestions: PreparedPastcastQuestion[] = [];
+    const updatedQuestions: PreparedPastcastQuestion[] = [];
+    const deletedIds = oldIds.filter((id) => !fetchedIdsSet.has(id));
+
+    for (const q of fetchedQuestions.map((q) => preparePastcastQuestion(q, platform))) {
+      if (oldIdsSet.has(q.id)) {
+        // TODO - check if question has changed for better performance
+        updatedQuestions.push(q);
+      } else {
+        createdQuestions.push(q);
+      }
+    }
+
+    const stats: { created?: number; updated?: number; deleted?: number } = {};
+
+    await prisma.pastcastQuestion.createMany({
+      data: createdQuestions
+    });
+    stats.created = createdQuestions.length;
+
+    for (const q of updatedQuestions) {
+      await prisma.pastcastQuestion.update({
+        where: { id: q.id },
+        data: q,
+      });
+      stats.updated ??= 0;
+      stats.updated++;
+    }
+
+    if (!partial) {
+      await prisma.pastcastQuestion.deleteMany({
+        where: {
+          id: {
+            in: deletedIds,
+          },
+        },
+      });
+      stats.deleted = deletedIds.length;
+    }
+
+    console.log(
+      "Done, " +
       Object.entries(stats)
         .map(([k, v]) => `${v} ${k}`)
         .join(", ")
-  );
+    )
+  } else {
+
+    const oldQuestions = await prisma.question.findMany({
+      where: {
+        platform: platform.name,
+      },
+    });
+
+    const fetchedIds = fetchedQuestions.map((q) => q.id);
+    const oldIds = oldQuestions.map((q) => q.id);
+
+    const fetchedIdsSet = new Set(fetchedIds);
+    const oldIdsSet = new Set(oldIds);
+
+    const createdQuestions: PreparedQuestion[] = [];
+    const updatedQuestions: PreparedQuestion[] = [];
+    const deletedIds = oldIds.filter((id) => !fetchedIdsSet.has(id));
+
+    for (const q of fetchedQuestions.map((q) => prepareQuestion(q, platform))) {
+      if (oldIdsSet.has(q.id)) {
+        // TODO - check if question has changed for better performance
+        updatedQuestions.push(q);
+      } else {
+        createdQuestions.push(q);
+      }
+    }
+
+    const stats: { created?: number; updated?: number; deleted?: number } = {};
+
+    await prisma.question.createMany({
+      data: createdQuestions.map((q) => ({
+        ...q,
+        firstSeen: new Date(),
+      })),
+    });
+    stats.created = createdQuestions.length;
+
+    for (const q of updatedQuestions) {
+      await prisma.question.update({
+        where: { id: q.id },
+        data: q,
+      });
+      stats.updated ??= 0;
+      stats.updated++;
+    }
+
+    if (!partial) {
+      await prisma.question.deleteMany({
+        where: {
+          id: {
+            in: deletedIds,
+          },
+        },
+      });
+      stats.deleted = deletedIds.length;
+    }
+
+    await prisma.history.createMany({
+      data: [...createdQuestions, ...updatedQuestions].map((q) => ({
+        ...q,
+        idref: q.id,
+      })),
+    });
+
+    console.log(
+      "Done, " +
+      Object.entries(stats)
+        .map(([k, v]) => `${v} ${k}`)
+        .join(", ")
+    );
+  }
+
 };
 
 export interface PlatformConfig {

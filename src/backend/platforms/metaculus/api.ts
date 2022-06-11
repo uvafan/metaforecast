@@ -41,6 +41,24 @@ const predictableProps = {
         type: "string",
       },
     },
+    optionalProperties: {
+      scale: {
+        properties: {
+          min: {
+            type: "string",
+          },
+          max: {
+            type: "string",
+          },
+          format: {
+            type: "string",
+          },
+          deriv_ratio: {
+            type: "uint32"
+          }
+        }
+      }
+    },
     additionalProperties: true,
   },
   number_of_predictions: {
@@ -63,6 +81,29 @@ const predictableProps = {
         },
         additionalProperties: true,
       },
+      history: {
+        elements: {
+          properties: {
+            t: {
+              type: "float64"
+            },
+            x1: {
+              optionalProperties: {
+                q1: {
+                  type: "float64",
+                },
+                q2: {
+                  type: "float64",
+                },
+                q3: {
+                  type: "float64",
+                },
+              },
+            },
+          },
+          additionalProperties: true,
+        }
+      }
     },
     additionalProperties: true,
   },
@@ -218,7 +259,7 @@ const fetchAndValidate = async <T = unknown>(
   }
   throw new Error(
     `Response validation for url ${url} failed: ` +
-      JSON.stringify(validator.errors)
+    JSON.stringify(validator.errors)
   );
 };
 
@@ -242,7 +283,7 @@ export async function fetchApiQuestions(
         if (!validateQuestion(result)) {
           throw new Error(
             `Response validation failed: ` +
-              JSON.stringify(validateQuestion.errors)
+            JSON.stringify(validateQuestion.errors)
           );
         }
         return result;
