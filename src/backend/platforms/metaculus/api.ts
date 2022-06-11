@@ -41,24 +41,30 @@ const predictableProps = {
         type: "string",
       },
     },
-    optionalProperties: {
-      scale: {
-        properties: {
-          min: {
-            type: "string",
-          },
-          max: {
-            type: "string",
-          },
-          deriv_ratio: {
-            type: "uint32"
-          }
-        }
-      },
-      format: {
-        type: "string",
-      },
-    },
+    // optionalProperties: {
+    //   scale: {
+    //     properties: {
+    //       min: {
+    //         oneOf: [
+    //           { type: "string" },
+    //           { type: "number" },
+    //         ]
+    //       },
+    //       max: {
+    //         oneOf: [
+    //           { type: "string" },
+    //           { type: "number" },
+    //         ]
+    //       },
+    //       deriv_ratio: {
+    //         type: "uint32"
+    //       }
+    //     }
+    //   },
+    //   format: {
+    //     type: "string",
+    //   },
+    // },
     additionalProperties: true,
   },
   number_of_predictions: {

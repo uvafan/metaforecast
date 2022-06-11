@@ -42,11 +42,11 @@ async function apiQuestionToFetchedQuestions(
 
     // exclude date questions for which the info it has resolved
     // cuts off some of the possible range
-    if (q.possibilities.format === "date" && q.possibilities.scale) {
-      if (new Date(q.possibilities.scale.max) > now) {
-        return true;
-      }
-    }
+    // if (q.possibilities.format === "date" && q.possibilities.scale && typeof (q.possibilities.scale.max) === "string") {
+    //   if (new Date(q.possibilities.scale.max) > now) {
+    //     return true;
+    //   }
+    // }
 
     // exclude questions that are supposed to have still been open
     // note that unfortunately we can't exclude questions that
@@ -179,7 +179,7 @@ export const metaculus: Platform<"id" | "debug"> = {
 
       next = apiQuestions.next;
       i += 1;
-      if (i === 20) {
+      if (i === 5) {
         break;
       }
     }
