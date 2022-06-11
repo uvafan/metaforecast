@@ -153,7 +153,7 @@ export const metaculus: Platform<"id" | "debug"> = {
       };
     }
 
-    const offset = 0;
+    const offset = 480;
     let next: string | null = "https://www.metaculus.com/api2/questions/?offset=" + offset;
     let i = 1;
     while (next) {
@@ -179,7 +179,7 @@ export const metaculus: Platform<"id" | "debug"> = {
 
       next = apiQuestions.next;
       i += 1;
-      if (i === 5) {
+      if (i === 15) {
         break;
       }
     }

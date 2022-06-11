@@ -184,15 +184,12 @@ export const processPlatform = async <T extends string = "">(
       },
     });
 
-    const fetchedIds = fetchedQuestions.map((q) => q.id);
     const oldIds = oldQuestions.map((q) => q.id);
 
-    const fetchedIdsSet = new Set(fetchedIds);
     const oldIdsSet = new Set(oldIds);
 
     const createdQuestions: PreparedPastcastQuestion[] = [];
     const updatedQuestions: PreparedPastcastQuestion[] = [];
-    const deletedIds = oldIds.filter((id) => !fetchedIdsSet.has(id));
 
     for (const q of fetchedQuestions.map((q) => preparePastcastQuestion(q, platform))) {
       if (oldIdsSet.has(q.id)) {
@@ -217,17 +214,6 @@ export const processPlatform = async <T extends string = "">(
       });
       stats.updated ??= 0;
       stats.updated++;
-    }
-
-    if (!partial) {
-      await prisma.pastcastQuestion.deleteMany({
-        where: {
-          id: {
-            in: deletedIds,
-          },
-        },
-      });
-      stats.deleted = deletedIds.length;
     }
 
     console.log(

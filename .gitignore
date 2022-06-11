@@ -36,3 +36,4 @@ package-lock.json ## use yarn.lock instead
 .netlify
 
 /.env*
+pastcasts.json
