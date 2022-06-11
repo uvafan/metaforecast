@@ -50,14 +50,14 @@ const predictableProps = {
           max: {
             type: "string",
           },
-          format: {
-            type: "string",
-          },
           deriv_ratio: {
             type: "uint32"
           }
         }
-      }
+      },
+      format: {
+        type: "string",
+      },
     },
     additionalProperties: true,
   },
@@ -99,6 +99,7 @@ const predictableProps = {
                   type: "float64",
                 },
               },
+              additionalProperties: true,
             },
           },
           additionalProperties: true,

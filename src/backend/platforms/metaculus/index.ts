@@ -42,7 +42,7 @@ async function apiQuestionToFetchedQuestions(
 
     // exclude date questions for which the info it has resolved
     // cuts off some of the possible range
-    if (q.possibilities.scale && q.possibilities.scale.format === "date") {
+    if (q.possibilities.format === "date" && q.possibilities.scale) {
       if (new Date(q.possibilities.scale.max) > now) {
         return true;
       }
@@ -153,7 +153,8 @@ export const metaculus: Platform<"id" | "debug"> = {
       };
     }
 
-    let next: string | null = "https://www.metaculus.com/api2/questions/";
+    const offset = 0;
+    let next: string | null = "https://www.metaculus.com/api2/questions/?offset=" + offset;
     let i = 1;
     while (next) {
       console.log(`\nQuery #${i} - ${next}`);
@@ -178,7 +179,9 @@ export const metaculus: Platform<"id" | "debug"> = {
 
       next = apiQuestions.next;
       i += 1;
-      if (i === 2) break;
+      if (i === 20) {
+        break;
+      }
     }
 
     return {
