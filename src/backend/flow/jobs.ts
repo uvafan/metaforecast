@@ -17,7 +17,7 @@ export const jobs: Job<string>[] = [
   ...getPlatforms().map((platform) => ({
     name: platform.name,
     message: `Download predictions from ${platform.name}`,
-    ...(platform.version === "v2" ? { args: platform.fetcherArgs } : {}),
+    ...(platform.version !== "v1" ? { args: platform.fetcherArgs } : {}),
     run: (args: any) => processPlatform(platform, args),
   })),
   {

@@ -60,6 +60,22 @@ async function apiQuestionToFetchedQuestions(
     return false;
   };
 
+  const cleanDescription = (
+    description: string | undefined
+  ): string | undefined => {
+    if (!description) return undefined;
+
+    const replacerA = (match: string, p1: string, p2: string, p3: string, p4: string, offset: number, string: string) => {
+      return p1 + p3 + p4;
+    }
+
+    const replacerB = (match: string, p1: string, p2: string, p3: string, p4: string, offset: number, string: string) => {
+      return p1 + p2 + p4;
+    }
+
+    return description.replace(/(\*\*)(\s+)(.+)(\*\*)/, replacerA).replace(/(\*\*)(.+)(\s+)(\*\*)/, replacerB)
+  }
+
   const buildFetchedQuestion = (
     q: ApiPredictable & ApiCommon
   ): Omit<FetchedPastcastQuestion, "url" | "description" | "title"> => {
@@ -70,9 +86,11 @@ async function apiQuestionToFetchedQuestions(
 
     const startDate = new Date(q.publish_time);
     const closeDate = new Date(q.close_time);
+    const resolveDate = new Date(q.resolve_time);
+    const endDate = new Date(Math.min(closeDate.getTime(), resolveDate.getTime()));
 
     var rng = seedrandom(`${platformName}-${q.id}`);
-    const vantageDate = new Date(startDate.getTime() + rng() * (closeDate.getTime() - startDate.getTime()));
+    const vantageDate = new Date(startDate.getTime() + rng() * (endDate.getTime() - startDate.getTime()));
 
     const possibleAggregateEl = q.community_prediction.history.reverse().find((el) => el.t < vantageDate.getTime());
     const vantageAggregateBinaryForecast = possibleAggregateEl ? possibleAggregateEl.x1.q2 : q.community_prediction.history[0].x1.q2;
@@ -98,7 +116,7 @@ async function apiQuestionToFetchedQuestions(
         return {
           ...tmp,
           title: `${apiQuestion.title} (${sq.title})`,
-          description: apiQuestionDetails.description || "",
+          description: cleanDescription(apiQuestionDetails.description) || "",
           url: `https://www.metaculus.com${apiQuestion.page_url}?sub-question=${sq.id}`,
         };
       });
@@ -117,7 +135,7 @@ async function apiQuestionToFetchedQuestions(
       {
         ...tmp,
         title: apiQuestion.title,
-        description: apiQuestionDetails.description || "",
+        description: cleanDescription(apiQuestionDetails.description) || "",
         url: "https://www.metaculus.com" + apiQuestion.page_url,
       },
     ];
@@ -153,7 +171,7 @@ export const metaculus: Platform<"id" | "debug"> = {
       };
     }
 
-    const offset = 480;
+    const offset = 0;
     let next: string | null = "https://www.metaculus.com/api2/questions/?offset=" + offset;
     let i = 1;
     while (next) {
@@ -179,9 +197,6 @@ export const metaculus: Platform<"id" | "debug"> = {
 
       next = apiQuestions.next;
       i += 1;
-      if (i === 15) {
-        break;
-      }
     }
 
     return {
