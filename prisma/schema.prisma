@@ -69,6 +69,20 @@ model Question {
   @@map("questions")
 }
 
+model Comment {
+  // E.g. "metaculus-123"
+  id               String                    @id
+  content          String
+  createdAt        DateTime                  
+  voteTotal        Int                       @default(0)
+  parentCommentId  String?
+  questionId       String
+  authorName       String
+  predictionValue  Float?
+  fetched          DateTime @db.Timestamp(6)
+  platform         String
+}
+
 model PastcastQuestion {
   // E.g. "fantasyscotus-580"
   id          String @id

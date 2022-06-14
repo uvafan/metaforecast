@@ -1,4 +1,4 @@
-import { Question, PastcastQuestion } from "@prisma/client";
+import { Question, PastcastQuestion, Comment } from "@prisma/client";
 
 import { QuestionOption } from "../../common/types";
 import { prisma } from "../database/prisma";
@@ -42,6 +42,8 @@ export type FetchedQuestion = Omit<
 
 export type FetchedPastcastQuestion = Omit<PastcastQuestion, | "fetched" | "platform" | "isDeleted">;
 
+export type FetchedComment = Omit<Comment, "fetched">;
+
 // fetcher should return null if platform failed to fetch questions for some reason
 type PlatformFetcherV1 = () => Promise<FetchedQuestion[] | null>;
 
@@ -57,6 +59,7 @@ type PlatformFetcherV2<ArgNames extends string> = (opts: {
 
 type PlatformPastcastFetcherV2Result = {
   questions: FetchedPastcastQuestion[];
+  comments: FetchedComment[];
   // if partial is true then we won't cleanup old questions from the database; this is useful when manually invoking a fetcher with arguments for updating a single question
   partial: boolean;
 } | null;
@@ -138,6 +141,14 @@ export const preparePastcastQuestion = (
   };
 };
 
+export const prepareComment = (c: FetchedComment, platform: Platform<any>): Comment => {
+  return {
+    ...c,
+    fetched: new Date(),
+    platform: platform.name,
+  }
+}
+
 export const upsertSingleQuestion = async (
   q: PreparedQuestion
 ): Promise<Question> => {
@@ -160,24 +171,22 @@ export const processPlatform = async <T extends string = "">(
     console.log(`Platform ${platform.name} doesn't have a fetcher, skipping`);
     return;
   }
-  const result =
-    platform.version === "v1"
-      ? { questions: await platform.fetcher(), partial: false } // this is not exactly PlatformFetcherV2Result, since `questions` can be null
-      : await platform.fetcher({ args });
-
-  if (!result) {
-    console.log(`Platform ${platform.name} didn't return any results`);
-    return;
-  }
-
-  const { questions: fetchedQuestions, partial } = result;
-
-  if (!fetchedQuestions || !fetchedQuestions.length) {
-    console.log(`Platform ${platform.name} didn't return any results`);
-    return;
-  }
 
   if (platform.version === "pastcast") {
+    const result = await platform.fetcher({ args });
+
+    if (!result) {
+      console.log(`Platform ${platform.name} didn't return any results`);
+      return;
+    }
+
+    const { questions: fetchedQuestions, comments: fetchedComments } = result;
+
+    if (!fetchedQuestions || !fetchedQuestions.length) {
+      console.log(`Platform ${platform.name} didn't return any results`);
+      return;
+    }
+
     const oldQuestions = await prisma.pastcastQuestion.findMany({
       where: {
         platform: platform.name,
@@ -185,7 +194,6 @@ export const processPlatform = async <T extends string = "">(
     });
 
     const oldIds = oldQuestions.map((q) => q.id);
-
     const oldIdsSet = new Set(oldIds);
 
     const createdQuestions: PreparedPastcastQuestion[] = [];
@@ -200,29 +208,89 @@ export const processPlatform = async <T extends string = "">(
       }
     }
 
-    const stats: { created?: number; updated?: number; deleted?: number } = {};
+    const questionStats: { created?: number; updated?: number; deleted?: number } = {};
 
     await prisma.pastcastQuestion.createMany({
       data: createdQuestions
     });
-    stats.created = createdQuestions.length;
+    questionStats.created = createdQuestions.length;
 
     for (const q of updatedQuestions) {
       await prisma.pastcastQuestion.update({
         where: { id: q.id },
         data: q,
       });
-      stats.updated ??= 0;
-      stats.updated++;
+      questionStats.updated ??= 0;
+      questionStats.updated++;
     }
 
     console.log(
-      "Done, " +
-      Object.entries(stats)
+      "Done with questions, " +
+      Object.entries(questionStats)
+        .map(([k, v]) => `${v} ${k}`)
+        .join(", ")
+    )
+
+    const oldComments = await prisma.comment.findMany({
+      where: {
+        platform: platform.name,
+      },
+    });
+
+    const oldCommentIds = oldComments.map((q) => q.id);
+    const oldCommentIdsSet = new Set(oldCommentIds);
+
+    const createdComments: Comment[] = [];
+    const updatedComments: Comment[] = [];
+
+    for (const c of fetchedComments.map((c) => prepareComment(c, platform))) {
+      if (oldCommentIdsSet.has(c.id)) {
+        // TODO - check if question has changed for better performance
+        updatedComments.push(c);
+      } else {
+        createdComments.push(c);
+      }
+    }
+
+    const commentStats: { created?: number; updated?: number; deleted?: number } = {};
+
+    await prisma.comment.createMany({
+      data: createdComments
+    });
+    commentStats.created = createdComments.length;
+
+    for (const c of updatedComments) {
+      await prisma.comment.update({
+        where: { id: c.id },
+        data: c,
+      });
+      commentStats.updated ??= 0;
+      commentStats.updated++;
+    }
+
+    console.log(
+      "Done comments, " +
+      Object.entries(commentStats)
         .map(([k, v]) => `${v} ${k}`)
         .join(", ")
     )
   } else {
+    const result =
+      platform.version === "v1"
+        ? { questions: await platform.fetcher(), partial: false } // this is not exactly PlatformFetcherV2Result, since `questions` can be null
+        : await platform.fetcher({ args });
+
+    if (!result) {
+      console.log(`Platform ${platform.name} didn't return any results`);
+      return;
+    }
+
+    const { questions: fetchedQuestions } = result;
+
+    if (!fetchedQuestions || !fetchedQuestions.length) {
+      console.log(`Platform ${platform.name} didn't return any results`);
+      return;
+    }
 
     const oldQuestions = await prisma.question.findMany({
       where: {
@@ -268,7 +336,7 @@ export const processPlatform = async <T extends string = "">(
       stats.updated++;
     }
 
-    if (!partial) {
+    if (!result.partial) {
       await prisma.question.deleteMany({
         where: {
           id: {

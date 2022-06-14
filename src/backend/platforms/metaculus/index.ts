@@ -1,12 +1,13 @@
-import { Platform, FetchedPastcastQuestion } from "..";
+import { Platform, FetchedPastcastQuestion, FetchedComment } from "..";
 import { sleep } from "../../utils/sleep";
 import {
+  ApiComments,
   ApiCommon,
   ApiMultipleQuestions,
   ApiPredictable,
   ApiQuestion,
   fetchApiQuestions,
-  fetchSingleApiQuestion,
+  fetchSingleApiQuestionAndComments,
 } from "./api";
 import seedrandom from "seedrandom";
 
@@ -14,9 +15,9 @@ const platformName = "metaculus";
 const now = new Date();
 const SLEEP_TIME = 1000;
 
-async function apiQuestionToFetchedQuestions(
+async function apiQuestionToFetchedQuestionsAndComments(
   apiQuestion: ApiQuestion
-): Promise<FetchedPastcastQuestion[]> {
+): Promise<{ questions: FetchedPastcastQuestion[], comments: FetchedComment[] }> {
   // one item can expand:
   // - to 0 questions if we don't want it;
   // - to 1 question if it's a simple forecast
@@ -103,13 +104,29 @@ async function apiQuestionToFetchedQuestions(
     };
   };
 
+  const buildFetchedComments = (
+    apiComments: ApiComments & ApiCommon
+  ): FetchedComment[] => {
+    return apiComments.results.map((c: any) => ({
+      id: "metaculus-" + c.id,
+      content: c.comment_text,
+      createdAt: new Date(c.created_time),
+      voteTotal: c.num_likes || 0,
+      parentCommentId: c.parent || undefined,
+      questionId: "metaculus-" + c.question.id,
+      authorName: c.author_name,
+      predictionValue: c.prediction_value || undefined,
+      platform: "metaculus",
+    }));
+  }
+
   if (apiQuestion.type === "group") {
     await sleep(SLEEP_TIME);
-    const apiQuestionDetails = await fetchSingleApiQuestion(apiQuestion.id);
+    const { question: apiQuestionDetails } = await fetchSingleApiQuestionAndComments(apiQuestion.id);
     if (apiQuestionDetails.type !== "group") {
       throw new Error("Expected `group` type"); // shouldn't happen, this is mostly for typescript
     }
-    return (apiQuestionDetails.sub_questions || [])
+    const questions = (apiQuestionDetails.sub_questions || [])
       .filter((q) => !skip(q))
       .map((sq) => {
         const tmp = buildFetchedQuestion(sq);
@@ -120,25 +137,31 @@ async function apiQuestionToFetchedQuestions(
           url: `https://www.metaculus.com${apiQuestion.page_url}?sub-question=${sq.id}`,
         };
       });
+
+    // TODO: fetch comments for question groups
+    return { questions, comments: [] };
   } else if (apiQuestion.type === "forecast") {
     if (apiQuestion.group) {
-      return []; // sub-question, should be handled on the group level
+      return { questions: [], comments: [] }; // sub-question, should be handled on the group level
     }
     if (skip(apiQuestion)) {
-      return [];
+      return { questions: [], comments: [] };
     }
 
     await sleep(SLEEP_TIME);
-    const apiQuestionDetails = await fetchSingleApiQuestion(apiQuestion.id);
+    const { question: apiQuestionDetails, comments: apiComments } = await fetchSingleApiQuestionAndComments(apiQuestion.id);
     const tmp = buildFetchedQuestion(apiQuestion);
-    return [
-      {
-        ...tmp,
-        title: apiQuestion.title,
-        description: cleanDescription(apiQuestionDetails.description) || "",
-        url: "https://www.metaculus.com" + apiQuestion.page_url,
-      },
-    ];
+    return {
+      questions: [
+        {
+          ...tmp,
+          title: apiQuestion.title,
+          description: cleanDescription(apiQuestionDetails.description) || "",
+          url: "https://www.metaculus.com" + apiQuestion.page_url,
+        },
+      ],
+      comments: buildFetchedComments(apiComments),
+    };
   } else {
     if (apiQuestion.type !== "claim") {
       // should never happen, since `discriminator` in JTD schema causes a strict runtime check
@@ -147,7 +170,7 @@ async function apiQuestionToFetchedQuestions(
         }, skipping`
       );
     }
-    return [];
+    return { questions: [], comments: [] };
   }
 }
 
@@ -159,14 +182,16 @@ export const metaculus: Platform<"id" | "debug"> = {
   fetcherArgs: ["id", "debug"],
   async fetcher(opts) {
     let allQuestions: FetchedPastcastQuestion[] = [];
+    let allComments: FetchedComment[] = [];
 
     if (opts.args?.id) {
       const id = Number(opts.args.id);
-      const apiQuestion = await fetchSingleApiQuestion(id);
-      const questions = await apiQuestionToFetchedQuestions(apiQuestion);
+      const { question: apiQuestion } = await fetchSingleApiQuestionAndComments(id);
+      const { questions, comments } = await apiQuestionToFetchedQuestionsAndComments(apiQuestion);
       console.log(questions);
       return {
         questions,
+        comments,
         partial: true,
       };
     }
@@ -184,7 +209,7 @@ export const metaculus: Platform<"id" | "debug"> = {
       let j = false;
 
       for (const result of results) {
-        const questions = await apiQuestionToFetchedQuestions(result);
+        const { questions, comments } = await apiQuestionToFetchedQuestionsAndComments(result);
         for (const question of questions) {
           console.log(`- ${question.title}`);
           if ((!j && i % 20 === 0) || opts.args?.debug) {
@@ -193,6 +218,7 @@ export const metaculus: Platform<"id" | "debug"> = {
           }
           allQuestions.push(question);
         }
+        allComments.push(...comments);
       }
 
       next = apiQuestions.next;
@@ -201,6 +227,7 @@ export const metaculus: Platform<"id" | "debug"> = {
 
     return {
       questions: allQuestions,
+      comments: allComments,
       partial: false,
     };
   },

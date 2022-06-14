@@ -219,6 +219,8 @@ export type ApiPredictable = JTDDataType<{
 }>;
 export type ApiQuestion = JTDDataType<typeof questionSchema>;
 
+export type ApiComments = any;
+
 type ApiShallowMultipleQuestions = JTDDataType<
   typeof shallowMultipleQuestionsSchema
 >;
@@ -299,9 +301,13 @@ export async function fetchApiQuestions(
   };
 }
 
-export async function fetchSingleApiQuestion(id: number): Promise<ApiQuestion> {
-  return await fetchAndValidate(
+export async function fetchSingleApiQuestionAndComments(id: number): Promise<{ question: ApiQuestion, comments: ApiComments }> {
+  const question = await fetchAndValidate(
     `https://www.metaculus.com/api2/questions/${id}/`,
     validateQuestion
   );
+
+  const comments = await fetchWithRetries<object>(`https://www.metaculus.com/api2/comments/?question=${id}`);
+
+  return { question, comments };
 }

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "metaculus-20",
+    "content": "How far above design sensitivity are they?  We could then scale the expect event rate(s).",
+    "createdAt": "2015-11-06T23:19:44.848Z",
+    "voteTotal": 0,
+    "parentCommentId": null,
+    "questionId": "metaculus-1",
+    "authorName": "Anthony",
+    "predictionValue": null,
+    "fetched": "2022-06-14T20:25:37.470Z",
+    "platform": "metaculus"
+  },
+  {
+    "id": "metaculus-11",
+    "content": "Just looked at the event-rate paper. Seems very likely that detectable events have happened (quite a few), so the the key question is how long it will take them to decide to announce.",
+    "createdAt": "2015-11-03T21:36:31.760Z",
+    "voteTotal": 0,
+    "parentCommentId": null,
+    "questionId": "metaculus-1",
+    "authorName": "Anthony",
+    "predictionValue": 0.75,
+    "fetched": "2022-06-14T20:25:37.470Z",
+    "platform": "metaculus"
+  },
+  {
+    "id": "metaculus-1",
+    "content": "There have been unconfirmed rumors circulating that they have already been detected as of Oct. 1;  see http://www.scientificamerican.com/article/has-giant-ligo-experiment-seen-gravitational-waves/",
+    "createdAt": "2015-10-02T02:37:48.778Z",
+    "voteTotal": 0,
+    "parentCommentId": null,
+    "questionId": "metaculus-1",
+    "authorName": "Anthony",
+    "predictionValue": 0.69,
+    "fetched": "2022-06-14T20:25:37.470Z",
+    "platform": "metaculus"
+  },
+  {
+    "id": "metaculus-171",
+    "content": "Rumor has it that this may resolve positively!\r\n\r\n[http://gizmodo.com/rumors-are-flying-that-we-may-have-finally-found-gravit-1752259868\r\n](http://gizmodo.com/rumors-are-flying-that-we-may-have-finally-found-gravit-1752259868)\r\n\r\n[http://www.theguardian.com/science/2016/jan/12/gravitation-waves-signal-rumoured-science?CMP=twt_gu](http://www.theguardian.com/science/2016/jan/12/gravitation-waves-signal-rumoured-science?CMP=twt_gu)",
+    "createdAt": "2016-01-12T04:07:53.909Z",
+    "voteTotal": 0,
+    "parentCommentId": null,
+    "questionId": "metaculus-1",
+    "authorName": "adrian",
+    "predictionValue": null,
+    "fetched": "2022-06-14T20:25:37.470Z",
+    "platform": "metaculus"
+  },
+  {
+    "id": "metaculus-19",
+    "content": "I don't think the announcement decision will slow them down too much (they've already written the relevant parts of the paper in response to previous blind test signals), but they're not yet at design sensitivity in this first run.  (Still, 30-60x more sensitive than last time pushes me over 50-50.)",
+    "createdAt": "2015-11-06T22:06:39.168Z",
+    "voteTotal": 0,
+    "parentCommentId": null,
+    "questionId": "metaculus-1",
+    "authorName": "Ken",
+    "predictionValue": 0.6,
+    "fetched": "2022-06-14T20:25:37.470Z",
+    "platform": "metaculus"
+  }
+]

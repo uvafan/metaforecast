@@ -9,7 +9,13 @@ let main = async () => {
   let string = JSON.stringify(json, null, 2);
   let filename = "pastcasts.json";
   fs.writeFileSync(filename, string);
-  console.log(`File downloaded to ./${filename}`);
+  console.log(`Pastcasts downloaded to ./${filename}`);
+
+  let cjson = await prisma.comment.findMany({});
+  let cstring = JSON.stringify(cjson, null, 2);
+  let cfilename = "pastcast_comments.json";
+  fs.writeFileSync(cfilename, cstring);
+  console.log(`Pastcasts downloaded to ./${cfilename}`);
 };
 
 main()
