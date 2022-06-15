@@ -112,7 +112,7 @@ async function apiQuestionToFetchedQuestionsAndComments(
       content: c.comment_text,
       createdAt: new Date(c.created_time),
       voteTotal: c.num_likes || 0,
-      parentCommentId: c.parent || undefined,
+      parentCommentId: c.parent?.toString() || undefined,
       questionId: "metaculus-" + c.question.id,
       authorName: c.author_name,
       predictionValue: c.prediction_value || undefined,
@@ -160,7 +160,7 @@ async function apiQuestionToFetchedQuestionsAndComments(
           url: "https://www.metaculus.com" + apiQuestion.page_url,
         },
       ],
-      comments: buildFetchedComments(apiComments),
+      comments: buildFetchedComments(apiComments).filter((c) => c.createdAt < tmp.vantageDate),
     };
   } else {
     if (apiQuestion.type !== "claim") {
@@ -196,7 +196,7 @@ export const metaculus: Platform<"id" | "debug"> = {
       };
     }
 
-    const offset = 0;
+    const offset = 4900;
     let next: string | null = "https://www.metaculus.com/api2/questions/?offset=" + offset;
     let i = 1;
     while (next) {
@@ -223,6 +223,9 @@ export const metaculus: Platform<"id" | "debug"> = {
 
       next = apiQuestions.next;
       i += 1;
+      if (i === 25) {
+        break;
+      }
     }
 
     return {
