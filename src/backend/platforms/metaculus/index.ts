@@ -92,6 +92,7 @@ async function apiQuestionToFetchedQuestionsAndComments(
 
     var rng = seedrandom(`${platformName}-${q.id}`);
     const vantageDate = new Date(startDate.getTime() + rng() * (endDate.getTime() - startDate.getTime()));
+    console.log({ startDate, closeDate, resolveDate, endDate, vantageDate });
 
     const possibleAggregateEl = q.community_prediction.history.reverse().find((el) => el.t < vantageDate.getTime());
     const vantageAggregateBinaryForecast = possibleAggregateEl ? possibleAggregateEl.x1.q2 : q.community_prediction.history[0].x1.q2;

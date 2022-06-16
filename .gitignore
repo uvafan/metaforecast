@@ -37,4 +37,4 @@ package-lock.json ## use yarn.lock instead
 
 /.env*
 pastcasts.json
-pastcast_comments.json
+comments.json
