@@ -92,7 +92,6 @@ async function apiQuestionToFetchedQuestionsAndComments(
 
     var rng = seedrandom(`${platformName}-${q.id}`);
     const vantageDate = new Date(startDate.getTime() + rng() * (endDate.getTime() - startDate.getTime()));
-    console.log({ startDate, closeDate, resolveDate, endDate, vantageDate });
 
     const possibleAggregateEl = q.community_prediction.history.reverse().find((el) => el.t < vantageDate.getTime());
     const vantageAggregateBinaryForecast = possibleAggregateEl ? possibleAggregateEl.x1.q2 : q.community_prediction.history[0].x1.q2;
@@ -113,7 +112,7 @@ async function apiQuestionToFetchedQuestionsAndComments(
       content: c.comment_text,
       createdAt: new Date(c.created_time),
       voteTotal: c.num_likes || 0,
-      parentCommentId: c.parent?.toString() || undefined,
+      parentCommentId: c.parent !== null ? "metaculus-" + c.parent?.toString() : undefined,
       questionId: "metaculus-" + c.question.id,
       authorName: c.author_name,
       predictionValue: c.prediction_value || undefined,
@@ -197,7 +196,7 @@ export const metaculus: Platform<"id" | "debug"> = {
       };
     }
 
-    const offset = 4900;
+    const offset = 3700;
     let next: string | null = "https://www.metaculus.com/api2/questions/?offset=" + offset;
     let i = 1;
     while (next) {
@@ -224,9 +223,6 @@ export const metaculus: Platform<"id" | "debug"> = {
 
       next = apiQuestions.next;
       i += 1;
-      if (i === 25) {
-        break;
-      }
     }
 
     return {
